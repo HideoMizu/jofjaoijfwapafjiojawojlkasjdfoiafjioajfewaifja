@@ -57,3 +57,30 @@ details[open] .slideBox{max-height:720px;opacity:1}
 .adminMenu{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .adminMenu button{min-height:62px}
 .successMsg{background:#ecfdf3;color:#027a48;border:1px solid #abefc6;border-radius:12px;padding:8px;margin:8px 0;font-size:13px}
+
+/* v5 */
+.answerBtn.selected{
+  border:3px solid #101828!important;
+  box-shadow:0 0 0 3px rgba(16,24,40,.12);
+  transform:scale(1.02);
+}
+.answerDone{
+  background:#ecfdf3;
+  color:#027a48;
+  border:1px solid #abefc6;
+  border-radius:12px;
+  padding:8px;
+  margin:8px 0;
+  font-size:13px;
+  font-weight:700;
+}
+.cacheNote{
+  background:#eff8ff;
+  color:#175cd3;
+  border:1px solid #b2ddff;
+  border-radius:12px;
+  padding:8px;
+  margin:8px 0;
+  font-size:12px;
+  line-height:1.35;
+}

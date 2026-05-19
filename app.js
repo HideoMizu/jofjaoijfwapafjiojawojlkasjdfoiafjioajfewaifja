@@ -1,5 +1,5 @@
-const KEY="soccerTeamManager.v5";
-const OLDKEYS=["soccerTeamManager.v4","soccerTeamManager.v3","soccerTeamManager.v2","soccerTeamManager.v1"];
+const KEY="soccerTeamManager.v6";
+const OLDKEYS=["soccerTeamManager.v5","soccerTeamManager.v4","soccerTeamManager.v3","soccerTeamManager.v2","soccerTeamManager.v1"];
 
 const I18N={
  ja:{title:"小学校サッカーチーム管理",login:"ログイン",team:"チーム名",password:"パスワード",enter:"入る",
@@ -16,6 +16,96 @@ const I18N={
  gradeAdd:"Add grade",memberSelect:"Select members",sampleReset:"Reset sample",logout:"Logout",dataJson:"Show JSON data",clearAll:"Clear all"}
 };
 
+
+/* ===== v6 remote shared storage =====
+   1) Deploy worker.js to Cloudflare Workers.
+   2) Create KV namespace and bind it as SOCCER_KV.
+   3) Paste your Worker URL below.
+   Example: const API_URL="https://soccer-api.yourname.workers.dev";
+*/
+const API_URL="https://soccer-api.hideo-mizutani.workers.dev"; // ← Cloudflare Worker URLをここに貼る。空欄ならローカル保存のみ。
+const REMOTE_POLL_MS=15000;
+let remoteTimer=null;
+let remoteBusy=false;
+let remoteLastPull=0;
+let syncStatus="local";
+let syncMsg="API未設定：この端末内だけに保存";
+let suppressRemoteSave=false;
+
+function isRemoteEnabled(){return API_URL && API_URL.startsWith("https://");}
+function syncText(){
+  if(!isRemoteEnabled()) return {cls:"warn", text: lang==="ja" ? "共有DB未設定：この端末内だけに保存中" : "Shared DB not set: saved only on this device"};
+  if(syncStatus==="ok") return {cls:"ok", text: syncMsg || (lang==="ja" ? "共有DBと同期済み" : "Synced")};
+  if(syncStatus==="bad") return {cls:"bad", text: syncMsg || (lang==="ja" ? "共有DBエラー" : "Sync error")};
+  return {cls:"warn", text: syncMsg || (lang==="ja" ? "共有DB確認中" : "Checking sync")};
+}
+function syncBarHtml(){
+  const s=syncText();
+  return `<div class="syncBar ${s.cls}">${esc(s.text)}</div>`;
+}
+async function remoteLoad(forceRender=false){
+  if(!isRemoteEnabled() || remoteBusy) return;
+  remoteBusy=true;
+  try{
+    const url=`${API_URL.replace(/\/$/,"")}/api/data?team=${encodeURIComponent(db.team.name)}&pw=${encodeURIComponent(db.team.password)}&t=${Date.now()}`;
+    const res=await fetch(url,{cache:"no-store"});
+    if(res.status===404){
+      syncStatus="warn";
+      syncMsg=lang==="ja"?"共有DBが空です。現在のデータを初期登録します。":"Shared DB is empty. Initializing.";
+      await remoteSaveNow();
+      return;
+    }
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json=await res.json();
+    if(json && json.data){
+      suppressRemoteSave=true;
+      db=normalize(json.data);
+      localStorage.setItem(KEY,JSON.stringify(db));
+      suppressRemoteSave=false;
+      syncStatus="ok";
+      syncMsg=(lang==="ja"?"共有DBから最新化：":"Updated from shared DB: ")+new Date().toLocaleTimeString();
+      remoteLastPull=Date.now();
+      if(forceRender) render();
+if(session) startRemoteSync();
+    }
+  }catch(e){
+    syncStatus="bad";
+    syncMsg=(lang==="ja"?"共有DBに接続できません：":"Cannot connect to shared DB: ")+e.message;
+  }finally{
+    remoteBusy=false;
+  }
+}
+let saveDebounce=null;
+function remoteSaveDebounced(){
+  if(!isRemoteEnabled() || suppressRemoteSave) return;
+  clearTimeout(saveDebounce);
+  saveDebounce=setTimeout(remoteSaveNow,450);
+}
+async function remoteSaveNow(){
+  if(!isRemoteEnabled()) return;
+  try{
+    db.meta=db.meta||{};
+    db.meta.updatedAt=new Date().toISOString();
+    db.meta.version=APP_VERSION;
+    const res=await fetch(`${API_URL.replace(/\/$/,"")}/api/data`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({team:db.team.name,password:db.team.password,data:db})
+    });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    syncStatus="ok";
+    syncMsg=(lang==="ja"?"共有DBへ保存済み：":"Saved to shared DB: ")+new Date().toLocaleTimeString();
+  }catch(e){
+    syncStatus="bad";
+    syncMsg=(lang==="ja"?"共有DBへ保存失敗：":"Save failed: ")+e.message;
+  }
+}
+function startRemoteSync(){
+  if(remoteTimer || !isRemoteEnabled()) return;
+  remoteLoad(true);
+  remoteTimer=setInterval(()=>remoteLoad(false),REMOTE_POLL_MS);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) remoteLoad(true); });
+}
 const sampleData={
  team:{name:"BBS",password:"ABC"},
  masters:{
@@ -41,10 +131,11 @@ let adminTab="";
 let currentMemberId=localStorage.getItem("soccer.currentMemberId")||"";
 let callSelection=new Set();
 let flashMsg="";
-const APP_VERSION="v5";
+const APP_VERSION="v6-shared";
 
 function t(k){return (I18N[lang]&&I18N[lang][k])||I18N.ja[k]||k}
-function toggleLang(){lang=lang==="ja"?"en":"ja";localStorage.setItem("soccer.lang",lang);render();}
+function toggleLang(){lang=lang==="ja"?"en":"ja";localStorage.setItem("soccer.lang",lang);render();
+if(session) startRemoteSync();}
 function normalize(d){
  d.masters=d.masters||{};
  if(!d.masters.uniforms)d.masters.uniforms=["赤","青"];
@@ -58,7 +149,7 @@ function normalize(d){
  delete d.votes; return d;
 }
 function load(){let raw=localStorage.getItem(KEY); if(!raw){for(const k of OLDKEYS){raw=localStorage.getItem(k);if(raw)break;}} if(!raw){localStorage.setItem(KEY,JSON.stringify(sampleData));return structuredClone(sampleData)} try{const d=normalize(JSON.parse(raw));localStorage.setItem(KEY,JSON.stringify(d));return d}catch(e){return structuredClone(sampleData)}}
-function save(){localStorage.setItem(KEY,JSON.stringify(db));}
+function save(){localStorage.setItem(KEY,JSON.stringify(db)); remoteSaveDebounced();}
 function uid(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -89,10 +180,18 @@ function renderLogin(){
  <label>${t("password")}</label><input id="pw" type="password" value="ABC">
  <p id="msg" class="danger small"></p><button class="red" onclick="login()">${t("enter")}</button></div>`;
 }
-function login(){if($("team").value.trim()===db.team.name&&$("pw").value.trim()===db.team.password){localStorage.setItem("soccer.loggedIn","1");session=true;render()}else $("msg").textContent=lang==="ja"?"チーム名またはパスワードが違います。":"Wrong team or password."}
+async function login(){
+ if($("team").value.trim()===db.team.name&&$("pw").value.trim()===db.team.password){
+  localStorage.setItem("soccer.loggedIn","1");session=true;
+  render();
+if(session) startRemoteSync();
+  startRemoteSync();
+  await remoteLoad(true);
+ }else $("msg").textContent=lang==="ja"?"チーム名またはパスワードが違います。":"Wrong team or password.";
+}
 function renderApp(){
  document.querySelector("#app").innerHTML=`
- <div class="header"><div class="headerTop"><div><h1>${t(page)}</h1><div class="small">${t("team")}：${esc(db.team.name)} / ${db.members.length}${t("people")} / ${db.games.length} games / ${APP_VERSION}</div></div>${langToggle()}</div></div>
+ <div class="header"><div class="headerTop"><div><h1>${t(page)}</h1><div class="small">${t("team")}：${esc(db.team.name)} / ${db.members.length}${t("people")} / ${db.games.length} games / ${APP_VERSION}</div>${syncBarHtml()}</div>${langToggle()}</div></div>
  <main id="main"></main>
  <div class="nav">${navBtn("check",t("check"))}${navBtn("answer",t("answer"))}${navBtn("admin",t("admin"))}</div>`;
  if(page==="check")checkPage(); if(page==="answer")answerPage(); if(page==="admin")adminPage();
@@ -188,6 +287,7 @@ function adminPage(){
 function adminHome(){
  $("main").innerHTML=`<div class="card"><h2>${t("admin")}</h2>
  <div class="small">${lang==="ja"?"管理者向けメニューです。試合登録、招集、メンバ、テンプレを管理します。":"Admin menu. Manage games, call-ups, members, and templates."}</div>
+ ${!isRemoteEnabled()?`<div class="setupBox">${lang==="ja"?"まだ共有DBが未設定です。worker.jsをCloudflare Workersに置き、app.jsのAPI_URLにWorker URLを貼ると、全員のスマホで同じデータが更新されます。":"Shared DB is not set. Deploy worker.js to Cloudflare Workers and paste the Worker URL into API_URL in app.js."}</div>`:""}
  <div class="cacheNote">${lang==="ja"?"現在のデータ保存は各スマホ内です。他のスマホへは自動反映されません。画面・コード更新が古い場合はURL末尾に ?v=5 を付けて開いてください。":"Data is stored inside each phone. It does not sync to other phones. If code looks old, open with ?v=5 at the end of the URL."}</div>
  <div class="adminMenu" style="margin-top:10px">
  <button onclick="adminTab='games';adminPage()">${t("gameReg")}</button>
@@ -299,5 +399,7 @@ function tplRow(kind,tpl){return `<div class="listItem"><b>${esc(tpl.name)}</b><
 function addTpl(kind){const name=$(kind==="item"?"itn":"ntn").value.trim(), text=$(kind==="item"?"itt":"ntt").value.trim(); if(!name||!text)return alert(lang==="ja"?"テンプレ名と内容を入れてください。":"Enter template name and text."); const arr=kind==="item"?db.masters.itemTemplates:db.masters.noteTemplates; arr.push({id:uid(kind==="item"?"it":"nt"),name,text});save();adminMaster();}
 function delTpl(kind,id){const arr=kind==="item"?db.masters.itemTemplates:db.masters.noteTemplates;if(arr.length<=1)return alert(lang==="ja"?"テンプレは最低1つ必要です。":"At least one template is required.");if(!confirm(lang==="ja"?"削除しますか？":"Delete?"))return;if(kind==="item")db.masters.itemTemplates=db.masters.itemTemplates.filter(tpl=>tpl.id!==id);else db.masters.noteTemplates=db.masters.noteTemplates.filter(tpl=>tpl.id!==id);save();adminMaster();}
 function exportData(){const w=window.open("","_blank");w.document.write("<pre>"+esc(JSON.stringify(db,null,2))+"</pre>");}
-function resetData(){if(!confirm(lang==="ja"?"保存済みデータをサンプルに戻しますか？":"Reset saved data to sample?"))return;db=structuredClone(sampleData);save();render();}
+function resetData(){if(!confirm(lang==="ja"?"保存済みデータをサンプルに戻しますか？":"Reset saved data to sample?"))return;db=structuredClone(sampleData);save();render();
+if(session) startRemoteSync();}
 render();
+if(session) startRemoteSync();

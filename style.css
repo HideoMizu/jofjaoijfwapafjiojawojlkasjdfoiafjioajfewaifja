@@ -84,3 +84,28 @@ details[open] .slideBox{max-height:720px;opacity:1}
   font-size:12px;
   line-height:1.35;
 }
+
+/* v6 shared server sync */
+.syncBar{
+  background:#f8fafc;
+  color:#344054;
+  border:1px solid #e4e7eb;
+  border-radius:12px;
+  padding:7px 8px;
+  margin:7px 0 0;
+  font-size:11px;
+  line-height:1.3;
+}
+.syncBar.ok{background:#ecfdf3;color:#027a48;border-color:#abefc6}
+.syncBar.warn{background:#fffaeb;color:#b54708;border-color:#fedf89}
+.syncBar.bad{background:#fef3f2;color:#b42318;border-color:#fecdca}
+.setupBox{
+  background:#fff7ed;
+  color:#9a3412;
+  border:1px solid #fed7aa;
+  border-radius:14px;
+  padding:10px;
+  margin:9px 0;
+  font-size:13px;
+  line-height:1.4;
+}

@@ -1,5 +1,5 @@
-const KEY="soccerTeamManager.v4";
-const OLDKEYS=["soccerTeamManager.v3","soccerTeamManager.v2","soccerTeamManager.v1"];
+const KEY="soccerTeamManager.v5";
+const OLDKEYS=["soccerTeamManager.v4","soccerTeamManager.v3","soccerTeamManager.v2","soccerTeamManager.v1"];
 
 const I18N={
  ja:{title:"小学校サッカーチーム管理",login:"ログイン",team:"チーム名",password:"パスワード",enter:"入る",
@@ -41,6 +41,7 @@ let adminTab="";
 let currentMemberId=localStorage.getItem("soccer.currentMemberId")||"";
 let callSelection=new Set();
 let flashMsg="";
+const APP_VERSION="v5";
 
 function t(k){return (I18N[lang]&&I18N[lang][k])||I18N.ja[k]||k}
 function toggleLang(){lang=lang==="ja"?"en":"ja";localStorage.setItem("soccer.lang",lang);render();}
@@ -91,7 +92,7 @@ function renderLogin(){
 function login(){if($("team").value.trim()===db.team.name&&$("pw").value.trim()===db.team.password){localStorage.setItem("soccer.loggedIn","1");session=true;render()}else $("msg").textContent=lang==="ja"?"チーム名またはパスワードが違います。":"Wrong team or password."}
 function renderApp(){
  document.querySelector("#app").innerHTML=`
- <div class="header"><div class="headerTop"><div><h1>${t(page)}</h1><div class="small">${t("team")}：${esc(db.team.name)} / ${db.members.length}${t("people")} / ${db.games.length} games</div></div>${langToggle()}</div></div>
+ <div class="header"><div class="headerTop"><div><h1>${t(page)}</h1><div class="small">${t("team")}：${esc(db.team.name)} / ${db.members.length}${t("people")} / ${db.games.length} games / ${APP_VERSION}</div></div>${langToggle()}</div></div>
  <main id="main"></main>
  <div class="nav">${navBtn("check",t("check"))}${navBtn("answer",t("answer"))}${navBtn("admin",t("admin"))}</div>`;
  if(page==="check")checkPage(); if(page==="answer")answerPage(); if(page==="admin")adminPage();
@@ -155,13 +156,28 @@ function renderMyTasks(){
 }
 function taskCard(g,m){
  const r=resFor(g.id,m.id), editable=canEditResponse(g);
+ const cur=r?r.answer:"";
+ const done=r?`<div class="answerDone">${lang==="ja"?"回答済み":"Reply saved"}：${esc(labelAnswer(r.answer))}</div>`:"";
+ const sel=a=>cur===a?" selected":"";
  return `<div class="listItem"><b>${esc(g.name)}</b><div class="small">${esc(g.date)} ${esc(timeText(g))} / ${esc(g.place)}</div>
  <div class="small">${lang==="ja"?"現在":"Current"}：${r?esc(labelAnswer(r.answer)):t("unanswered")} / ${lang==="ja"?"締切":"Deadline"}：${esc(g.deadline||g.date)}</div>
- ${editable?`<div class="bigAnswer"><button class="yes" onclick="answer('${g.id}','${m.id}','参加')">${t("yes")}</button><button class="hold" onclick="answer('${g.id}','${m.id}','保留')">${t("hold")}</button><button class="no" onclick="answer('${g.id}','${m.id}','不参加')">${t("no")}</button></div>`:`<div class="notice">${lang==="ja"?"締切後のため修正できません。":"Deadline passed. Cannot edit."}</div>`}
+ ${done}
+ ${editable?`<div class="bigAnswer">
+  <button class="yes answerBtn${sel("参加")}" onclick="answer('${g.id}','${m.id}','参加')">${t("yes")}</button>
+  <button class="hold answerBtn${sel("保留")}" onclick="answer('${g.id}','${m.id}','保留')">${t("hold")}</button>
+  <button class="no answerBtn${sel("不参加")}" onclick="answer('${g.id}','${m.id}','不参加')">${t("no")}</button>
+ </div>`:`<div class="notice">${lang==="ja"?"締切後のため修正できません。":"Deadline passed. Cannot edit."}</div>`}
  </div>`;
 }
 function labelAnswer(a){return a==="参加"?t("yes"):a==="不参加"?t("no"):t("hold")}
-function answer(gameId,memberId,ans){const m=db.members.find(x=>x.id===memberId);db.responses=db.responses.filter(r=>!(r.gameId===gameId&&r.memberId===memberId));db.responses.push({gameId,memberId,name:m.nickname,answer:ans,at:new Date().toISOString()});save();renderMyTasks();}
+function answer(gameId,memberId,ans){
+ const m=db.members.find(x=>x.id===memberId);
+ db.responses=db.responses.filter(r=>!(r.gameId===gameId&&r.memberId===memberId));
+ db.responses.push({gameId,memberId,name:m.nickname,answer:ans,at:new Date().toISOString()});
+ save();
+ renderMyTasks();
+ setTimeout(()=>alert((lang==="ja"?"回答を保存しました：":"Reply saved: ")+labelAnswer(ans)),50);
+}
 
 /* 管理者向け */
 function adminPage(){
@@ -172,6 +188,7 @@ function adminPage(){
 function adminHome(){
  $("main").innerHTML=`<div class="card"><h2>${t("admin")}</h2>
  <div class="small">${lang==="ja"?"管理者向けメニューです。試合登録、招集、メンバ、テンプレを管理します。":"Admin menu. Manage games, call-ups, members, and templates."}</div>
+ <div class="cacheNote">${lang==="ja"?"現在のデータ保存は各スマホ内です。他のスマホへは自動反映されません。画面・コード更新が古い場合はURL末尾に ?v=5 を付けて開いてください。":"Data is stored inside each phone. It does not sync to other phones. If code looks old, open with ?v=5 at the end of the URL."}</div>
  <div class="adminMenu" style="margin-top:10px">
  <button onclick="adminTab='games';adminPage()">${t("gameReg")}</button>
  <button onclick="adminTab='call';adminPage()">${t("call")}</button>

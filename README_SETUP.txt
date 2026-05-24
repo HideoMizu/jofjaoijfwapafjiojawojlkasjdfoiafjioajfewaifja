@@ -1,14 +1,18 @@
-# Soccer Team Manager v7
+Soccer Manager v8
 
-GitHubに置く: index.html / style.css / app.js
-Cloudflare Workerに貼る: worker.js
-KV binding name: SOCCER_KV
+GitHubにアップロード:
+- index.html
+- style.css
+- app.js
+
+Cloudflare Workerに貼り替え:
+- worker.js
+
+KV Binding: SOCCER_KV
 
 初期ログイン:
-- ワイ / ABC
-- 管理者 / ABC
-- 会計 / ABC
-- 太郎家 / 123
-- 次郎三郎家 / 123
+- スイタニ / 111
+- ヤマダ / 222
+- スズキ / 333
 
-注意: LINE公式連携は未実装。通知はコピー方式。個人情報は入れない運用推奨。
+URL末尾は ?v=8 で開く。

@@ -1,18 +1,20 @@
-Soccer Manager v8
+Soccer Team Manager v9
 
-GitHubにアップロード:
+GitHub:
 - index.html
 - style.css
 - app.js
 
-Cloudflare Workerに貼り替え:
+Cloudflare Worker:
 - worker.js
 
-KV Binding: SOCCER_KV
+KV Binding:
+- SOCCER_KV
 
 初期ログイン:
 - スイタニ / 111
 - ヤマダ / 222
 - スズキ / 333
 
-URL末尾は ?v=8 で開く。
+反映後は index.html?v=9 で開いてください。
+古いデータが残る場合、右上の「更新」を押してください。

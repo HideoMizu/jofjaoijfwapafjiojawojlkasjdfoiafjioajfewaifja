@@ -1,4 +1,4 @@
-Soccer Team Manager v9
+Soccer Team Manager v10
 
 GitHub:
 - index.html
@@ -16,5 +16,5 @@ KV Binding:
 - ヤマダ / 222
 - スズキ / 333
 
-反映後は index.html?v=9 で開いてください。
+反映後は index.html?v=10 で開いてください。
 古いデータが残る場合、右上の「更新」を押してください。
